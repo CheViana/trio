@@ -12,6 +12,7 @@ from __future__ import annotations
 
 # this file is not run as part of the tests, instead it's run standalone from check.sh
 import argparse
+import inspect
 import json
 import subprocess
 import sys
@@ -153,6 +154,21 @@ def check_type(
 
             # ignore errors about missing docstrings if they're available at runtime
             if message.startswith("No docstring found for"):
+
+                # example 1 - got into trio namespace through globals.update - probably should not be typechecked at all
+                if symbol["name"] == "trio.socket.sethostname":
+                    doc = inspect.getdoc(symbol["name"])
+                    print(f"got doc from inspect for {symbol['name']}: {type(doc)} {doc}")
+                
+                # example 2 - trio._unix_pipes.FdStream.send_all - docstring in base class
+                if symbol["name"] == "trio._unix_pipes.FdStream.send_all":
+                    if symbol["name"].startswith("trio."):
+                        module = __import__("trio._unix_pipes")
+                        obj_with_doc = getattr(module, "FdStream")
+                        func_with_doc = getattr(obj_with_doc, "send_all")
+                        doc = inspect.getdoc(func_with_doc)
+                        print(f"got doc from inspect for {symbol['name']}: {type(doc)} {doc}")
+
                 if has_docstring_at_runtime(symbol["name"]):
                     continue
             else:
